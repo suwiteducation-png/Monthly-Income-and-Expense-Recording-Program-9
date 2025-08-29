@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="th" data-theme="dark" style="--font:'Kanit', ui-sans-serif, system-ui, 'Segoe UI', Roboto, Arial">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>WealthFlow • ตัวจัดการรายรับรายจ่าย (TH + ธีม + Deduction UI)</title>
+  <meta name="description" content="WealthFlow — Expense Tracker (Thai UI) with Supabase, single-file, deduction-centric tax calculator"/>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&family=Prompt:wght@300;400;600;700&family=Sarabun:wght@300;400;600;700&family=Noto+Sans+Thai:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{ --bg:#0b1220; --bg2:#111827; --panel:rgba(255,255,255,.06); --panel-2:rgba(255,255,255,.03);
+           --border:rgba(255,255,255,.14); --txt:#e5e7eb; --muted:#9ca3af;
+           --brand:#60a5fa; --ok:#34d399; --warn:#fbbf24; --err:#ef4444;
+           --shadow:0 10px 30px rgba(0,0,0,.35); --ring:0 0 0 3px rgba(96,165,250,.35); }
+    [data-theme="light"]{ --bg:#f6f7fb; --bg2:#ffffff; --panel:#ffffff; --panel-2:#f8fafc; --border:#e5e7eb;
+                          --txt:#0f172a; --muted:#6b7280; --shadow:0 10px 25px rgba(2,6,23,.08); --ring:0 0 0 3px rgba(37,99,235,.25); }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;font-family:var(--font);color:var(--txt);
+      background:radial-gradient(1200px 800px at 10% 10%, var(--bg2) 0%, var(--bg) 60%);min-height:100vh}
+    .container{max-width:1200px;margin:0 auto;padding:24px}
+    .navbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
+      padding:12px 16px;margin:12px 0;border-radius:14px;background:linear-gradient(135deg,var(--panel),var(--panel-2));
+      border:1px solid var(--border);backdrop-filter:blur(10px);box-shadow:var(--shadow);}
+    .logo{display:flex;gap:10px;align-items:center}.logo svg{width:26px;height:26px}
+    .nav-right{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    a.nav{padding:8px 10px;border-radius:10px;text-decoration:none;color:var(--txt);font-weight:650;border:1px solid transparent}
+    a.nav:hover{background:var(--panel-2);border-color:var(--border)} a.nav.active{background:linear-gradient(120deg,rgba(96,165,250,.2),rgba(52,211,153,.15));border-color:transparent}
+    .theme-toggle{border:1px solid var(--border);background:var(--panel-2);border-radius:10px;padding:8px 10px;cursor:pointer}
+    .grid{display:grid;gap:16px}
+    .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    @media (max-width:1000px){.grid-2,.grid-3{grid-template-columns:1fr}}
+    .card{background:linear-gradient(120deg,var(--panel),var(--panel-2));border:1px solid var(--border);
+      border-radius:18px;padding:18px;box-shadow:var(--shadow)}
+    h1,h2,h3{margin:8px 0 12px}.muted{color:var(--muted)}
+    .row{display:flex;gap:10px}.row>*{flex:1}
+    label{display:block;margin-bottom:6px;color:var(--muted);font-size:.95rem}
+    input.input,select,textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);
+      background:var(--panel-2);color:var(--txt);outline:none;transition:box-shadow .15s ease,border-color .15s ease}
+    input.input:focus,select:focus,textarea:focus{box-shadow:var(--ring);border-color:transparent}
+    button.btn{padding:10px 14px;border-radius:12px;border:1px solid transparent;cursor:pointer;background:linear-gradient(120deg,var(--brand),#7dd3fc);color:#0b1220;font-weight:800}
+    .btn.secondary{background:linear-gradient(120deg,var(--ok),#a7f3d0)} .btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--border)}
+    .btn.danger{background:linear-gradient(120deg,var(--err),#fca5a5);color:#1b0b0b}.btn.small{padding:6px 10px;border-radius:10px;font-weight:700}
+    .center{text-align:center}.right{text-align:right}.pill{display:inline-block;padding:3px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:12px}
+    .table{width:100%;border-collapse:collapse;overflow:hidden;border-radius:14px}
+    .table th,.table td{padding:12px;border-bottom:1px solid var(--border);text-align:left}
+    .table th{color:var(--muted);font-weight:700;background:var(--panel-2);position:sticky;top:0}
+    .footer{margin:40px 0;color:var(--muted);text-align:center;font-size:.9rem}
+    .hidden{display:none !important}
+    #toast{position:fixed;right:16px;bottom:16px;z-index:100}.toast{min-width:260px;margin-top:10px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--bg2);box-shadow:var(--shadow)}
+    .toast.ok{border-color:rgba(52,211,153,.4)}.toast.err{border-color:rgba(239,68,68,.45)}.toast .title{font-weight:800}
+    details summary{cursor:pointer;user-select:none}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="navbar" id="navbar">
+      <div class="logo">
+        <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="60" cy="60" r="56" stroke="var(--brand)" stroke-width="6" opacity="0.6"/>
+          <path d="M30 70 C45 35, 75 35, 90 70" stroke="var(--ok)" stroke-width="8" stroke-linecap="round"/>
+          <circle cx="60" cy="60" r="8" fill="var(--brand)"/>
+        </svg>
+        <strong>WealthFlow</strong>
+        <span class="pill" id="userEmail"></span>
+      </div>
+      <div class="nav-right">
+        <a href="#dashboard" class="nav" data-nav>สรุป</a>
+        <a href="#transactions" class="nav" data-nav>รายการเงิน</a>
+        <a href="#categories" class="nav" data-nav>หมวดหมู่</a>
+        <a href="#reports" class="nav" data-nav>รายงาน</a>
+        <a href="#tax" class="nav" data-nav>ภาษี</a>
+        <a href="#notifications" class="nav" data-nav>แจ้งเตือนอีเมล</a>
+        <button id="themeBtn" class="theme-toggle" title="สลับโหมดแสง/มืด">🌗</button>
+        <button class="btn ghost" id="signoutBtn">ออกจากระบบ</button>
+      </div>
+    </div>
+
+    <!-- Login -->
+    <section id="view-login" class="grid grid-2">
+      <div class="card">
+        <h2>เข้าสู่ระบบ</h2>
+        <div class="row">
+          <div><label>อีเมล</label><input class="input" id="login_email" type="email" placeholder="you@example.com" autocomplete="username"></div>
+          <div><label>รหัสผ่าน</label><input class="input" id="login_password" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn icon" id="loginBtn">🔐 เข้าสู่ระบบ</button>
+          <button class="btn ghost" id="resetBtn">ส่งลิงก์รีเซ็ตรหัสผ่าน</button>
+        </div>
+        <p class="muted" id="login_msg"></p>
+      </div>
+      <div class="card">
+        <h2>สมัครสมาชิกใหม่</h2>
+        <div class="row">
+          <div><label>อีเมล</label><input class="input" id="signup_email" type="email" placeholder="you@example.com" autocomplete="email"></div>
+          <div><label>รหัสผ่าน</label><input class="input" id="signup_password" type="password" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="new-password"></div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <div><label>เบอร์โทรศัพท์</label><input class="input" id="signup_phone" type="tel" placeholder="0812345678"></div>
+          <div><label>ชื่อที่แสดง</label><input class="input" id="signup_name" type="text" placeholder="ชื่อ"></div>
+        </div>
+        <div style="margin-top:12px;"><button class="btn secondary icon" id="signupBtn">✨ สมัครสมาชิก</button></div>
+        <p class="muted" id="signup_msg"></p>
+      </div>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="view-dashboard" class="hidden">
+      <div class="grid grid-3">
+        <div class="card">
+          <h3>เดือนที่เลือก</h3>
+          <div class="row">
+            <div><label>เดือน</label><input class="input" type="month" id="dash_month"></div>
+            <div style="align-self:flex-end;"><button class="btn icon" id="dash_refresh">🔄 ดูสรุป</button></div>
+          </div>
+          <p class="muted">สรุปรายรับ-รายจ่าย และกราฟวงกลมตามหมวดหมู่</p>
+        </div>
+        <div class="card center"><h3>รายรับ</h3><div class="pill" id="dash_income">0.00</div></div>
+        <div class="card center"><h3>รายจ่าย</h3><div class="pill" id="dash_expense">0.00</div></div>
+      </div>
+      <div class="grid grid-2" style="margin-top:16px;">
+        <div class="card"><h3>สัดส่วนรายจ่ายตามหมวด</h3><canvas id="pie_expense"></canvas></div>
+        <div class="card"><h3>สัดส่วนรายรับตามหมวด</h3><canvas id="pie_income"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Transactions -->
+    <section id="view-transactions" class="hidden">
+      <div class="grid grid-2">
+        <div class="card">
+          <h2>บันทึกรายการ</h2>
+          <div class="row">
+            <div><label>วันที่</label><input class="input" id="t_date" type="date"></div>
+            <div><label>ประเภท</label><select id="t_type" class="input"><option value="expense">รายจ่าย</option><option value="income">รายรับ</option></select></div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <div><label>หมวดหมู่</label><select id="category_id" class="input"></select></div>
+            <div><label>จำนวนเงิน</label><input class="input" id="amount" type="number" step="0.01" min="0" placeholder="เช่น 1200.00"></div>
+          </div>
+          <div style="margin-top:10px;"><label>บันทึก/รายละเอียด</label><input class="input" id="memo" type="text" placeholder="เช่น ค่าอาหารกลางวัน / ขายของ"></div>
+          <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn icon" id="tx_save">💾 บันทึก</button>
+            <button class="btn ghost" id="tx_reset">ล้างฟอร์ม</button>
+            <span class="muted" id="tx_msg"></span>
+          </div>
+        </div>
+        <div class="card">
+          <h2>ค้นหา/ดูย้อนหลัง</h2>
+          <div class="row">
+            <div><label>เดือน</label><input class="input" id="filter_month" type="month"></div>
+            <div><label>ค้นหาข้อความ</label><input class="input" id="filter_q" type="text" placeholder="ค้นหา memo หรือชื่อหมวด"></div>
+          </div>
+          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn icon" id="tx_load">📄 ดึงข้อมูล</button>
+            <button class="btn ghost" id="tx_export">⬇️ ส่งออก CSV</button>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <table class="table" id="tx_table">
+          <thead><tr><th>วันที่</th><th>ประเภท</th><th>หมวด</th><th class="right">จำนวน</th><th>บันทึก</th><th class="right">การทำงาน</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="tx_empty" class="muted hidden">ยังไม่มีรายการสำหรับเดือนนี้</div>
+      </div>
+    </section>
+
+    <!-- Categories -->
+    <section id="view-categories" class="hidden">
+      <div class="grid grid-2">
+        <div class="card">
+          <h2>เพิ่มหมวดหมู่</h2>
+          <div class="row">
+            <div><label>ประเภท</label><select id="cat_type" class="input"><option value="expense">รายจ่าย</option><option value="income">รายรับ</option></select></div>
+            <div><label>ชื่อหมวดหมู่</label><input class="input" id="cat_name" type="text" placeholder="เช่น อาหาร / เงินเดือน"></div>
+          </div>
+          <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn icon" id="cat_add">➕ เพิ่ม</button>
+            <button class="btn ghost" id="cat_seed">✨ ใส่ค่าเริ่มต้น</button>
+          </div>
+          <p class="muted" id="cat_msg"></p>
+        </div>
+        <div class="card">
+          <h2>รายการหมวดหมู่</h2>
+          <table class="table" id="cat_table"><thead><tr><th>ประเภท</th><th>ชื่อ</th><th class="right">การทำงาน</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Reports -->
+    <section id="view-reports" class="hidden">
+      <div class="card">
+        <h2>รายงานทั้งปี</h2>
+        <div class="row">
+          <div><label>ปี</label><input class="input" id="rep_year" type="number" min="2000" step="1"></div>
+          <div style="align-self:flex-end;"><button class="btn icon" id="rep_load">📊 ดูรายงาน</button></div>
+        </div>
+        <p class="muted">กราฟแท่ง รายรับ vs รายจ่าย รายเดือน</p>
+        <canvas id="rep_bar" style="margin-top:10px;"></canvas>
+      </div>
+    </section>
+
+    <!-- Tax (Deduction-first) -->
+    <section id="view-tax" class="hidden">
+      <div class="card">
+        <h2>คำนวณภาษี (โหมดเลือก “รายการลดหย่อน”)</h2>
+        <p class="muted">เป็นการคำนวณแบบประมาณการ — โปรดตรวจสอบเงื่อนไขจริงก่อนยื่นภาษี</p>
+        <div class="row">
+          <div><label>ปีภาษี</label><input class="input" id="tax_year" type="number" min="2000"></div>
+          <div><label>รายได้สุทธิใช้คำนวณ (อัตโนมัติจากข้อมูลในปี)</label><input class="input" id="tax_netinfo" type="text" disabled value="-"></div>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:8px;">
+          <div class="card">
+            <h3>รายการลดหย่อน: กองทุน</h3>
+            <div class="row">
+              <div><label>ยอดกองทุนรวม (บาท) — SSF/RMF/กองทุนสำรองฯ</label><input class="input" id="ded_funds_amt" type="number" step="1" value="0"></div>
+            </div>
+            <div class="row" style="margin-top:8px;">
+              <div><label>เพดานตามรายได้ (%)</label><input class="input" id="ded_funds_pct" type="number" step="1" value="30"></div>
+              <div><label>เพดานสูงสุด (บาท)</label><input class="input" id="ded_funds_cap" type="number" step="1" value="500000"></div>
+            </div>
+            <p class="muted">ระบบจะใช้ค่าที่ต่ำที่สุดระหว่าง “ยอดจริง”, “% ของรายได้” และ “เพดานบาท”</p>
+          </div>
+
+          <div class="card">
+            <h3>รายการลดหย่อน: เงินประกันสังคม & ที่อยู่อาศัย</h3>
+            <div class="row">
+              <div><label>เงินประกันสังคม (บาท)</label><input class="input" id="ded_ssf_amt" type="number" step="1" value="0"></div>
+              <div><label>เพดานประกันสังคม (บาท)</label><input class="input" id="ded_ssf_cap" type="number" step="1" value="9000"></div>
+            </div>
+            <div class="row" style="margin-top:8px;">
+              <div><label>ดอกเบี้ยกู้ซื้อที่อยู่อาศัย (บาท)</label><input class="input" id="ded_home_amt" type="number" step="1" value="0"></div>
+              <div><label>เพดานดอกเบี้ยบ้าน (บาท)</label><input class="input" id="ded_home_cap" type="number" step="1" value="100000"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>รายการลดหย่อน: ครอบครัว</h3>
+            <div class="row">
+              <div><label>คู่สมรส (บาท)</label><input class="input" id="ded_spouse_amt" type="number" step="1" value="0"></div>
+              <div><label>บุตร (จำนวนคน)</label><input class="input" id="ded_child_count" type="number" step="1" value="0"></div>
+            </div>
+            <div class="row" style="margin-top:8px;">
+              <div><label>ค่าลดหย่อน/บุตร (บาท/คน)</label><input class="input" id="ded_child_per" type="number" step="1" value="30000"></div>
+              <div><label>ดูแลบิดามารดา/ผู้พิการ (บาท รวม)</label><input class="input" id="ded_parent_amt" type="number" step="1" value="0"></div>
+            </div>
+            <p class="muted">คุณสามารถใส่ยอดจริงที่มีหลักฐาน เช่น คู่สมรสได้ 60,000 (ตามคุณสมบัติ), บุตร 30,000 ต่อคน ฯลฯ</p>
+          </div>
+
+          <div class="card">
+            <h3>รายการลดหย่อน: ประกัน & กองทุนอื่นๆ</h3>
+            <div class="row">
+              <div><label>ประกันชีวิต (บาท)</label><input class="input" id="ded_life_amt" type="number" step="1" value="0"></div>
+              <div><label>เพดานประกันชีวิต</label><input class="input" id="ded_life_cap" type="number" step="1" value="100000"></div>
+            </div>
+            <div class="row" style="margin-top:8px;">
+              <div><label>ประกันสุขภาพ (บาท)</label><input class="input" id="ded_health_amt" type="number" step="1" value="0"></div>
+              <div><label>เพดานประกันสุขภาพ</label><input class="input" id="ded_health_cap" type="number" step="1" value="25000"></div>
+            </div>
+            <div class="row" style="margin-top:8px;">
+              <div><label>กองทุนอื่นๆ (บาท)</label><input class="input" id="ded_other_amt" type="number" step="1" value="0"></div>
+              <div><label>เพดานกองทุนอื่นๆ</label><input class="input" id="ded_other_cap" type="number" step="1" value="0"></div>
+            </div>
+          </div>
+        </div>
+
+        <details style="margin-top:10px;">
+          <summary>ดูอัตราก้าวหน้า (อ้างอิงทั่วไป)</summary>
+          <div class="muted" style="margin-top:6px;">
+            0–150,000 = 0% • 150,001–300,000 = 5% • 300,001–500,000 = 10% • 500,001–750,000 = 15% • 750,001–1,000,000 = 20% • 1,000,001–2,000,000 = 25% • 2,000,001–5,000,000 = 30% • มากกว่า 5,000,000 = 35%
+          </div>
+        </details>
+
+        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn icon" id="tax_calc">🧮 คำนวณจากข้อมูลทั้งปี</button>
+          <button class="btn ghost" id="tax_clear">รีเซ็ตค่าลดหย่อน</button>
+        </div>
+        <div class="card" style="margin-top:12px;">
+          <h3>ผลลัพธ์</h3>
+          <div id="tax_result"></div>
+          <div id="tax_debug" class="muted" style="margin-top:8px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Notifications -->
+    <section id="view-notifications" class="hidden">
+      <div class="card">
+        <h2>ตั้งค่าอีเมลแจ้งเตือน</h2>
+        <div class="row">
+          <div><label>ประเภท</label><select id="nt_kind" class="input"><option value="monthly_summary">สรุปรายเดือน</option><option value="threshold_alert">เตือนเมื่อรายจ่ายเกิน</option></select></div>
+          <div><label>อีเมลผู้รับ</label><input id="nt_email" class="input" type="email" placeholder="you@example.com"></div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <div><label>ความถี่</label><select id="nt_frequency" class="input"><option value="monthly">ทุกเดือน</option><option value="weekly">รายสัปดาห์</option><option value="daily">รายวัน</option></select></div>
+          <div><label>เกณฑ์รายจ่าย (บาท)</label><input id="nt_threshold" class="input" type="number" step="1" placeholder="เช่น 20000"></div>
+        </div>
+        <div style="margin-top:12px;"><button class="btn icon" id="nt_save">📨 บันทึกการตั้งค่า</button></div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h3>รายการการแจ้งเตือนของฉัน</h3>
+        <table class="table" id="nt_table"><thead><tr><th>ประเภท</th><th>อีเมล</th><th>ความถี่</th><th>เกณฑ์</th><th>เปิดใช้งาน</th><th class="right">การทำงาน</th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+
+    <div class="footer">© 2025 WealthFlow • TH UI + Deduction-first Tax • เชื่อม Supabase</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+    const SUPABASE_URL = 'https://qtfmqycwycysdmrhvfzl.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0Zm1xeWN3eWN5c2Rtcmh2ZnpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxOTQ2NzgsImV4cCI6MjA3MTc3MDY3OH0.KWN_gmitPSyc7L2MJzMR7jyrPCCp0EmlWzYUzSI8WWE';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const $=(s)=>document.querySelector(s), $$=(s)=>document.querySelectorAll(s);
+    const fmt=(n)=>Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    const ymd=(d)=>new Date(d).toISOString().slice(0,10);
+    function toast(msg,type='ok'){ const t=document.createElement('div'); t.className='toast '+(type==='err'?'err':'ok'); t.innerHTML=`<div class="title">${type==='err'?'ผิดพลาด':'สำเร็จ'}</div><div>${msg}</div>`; $('#toast').appendChild(t); setTimeout(()=>{t.style.opacity='0'; setTimeout(()=>t.remove(),300);},2200); }
+
+    // Theme
+    $('#themeBtn').onclick=()=>{ const html=document.documentElement; html.setAttribute('data-theme', html.getAttribute('data-theme')==='dark'?'light':'dark'); };
+
+    // Router (minimal)
+    function show(id){ $$('#view-login, #view-dashboard, #view-transactions, #view-categories, #view-reports, #view-tax, #view-notifications').forEach(v=>v.classList.add('hidden')); $(id)?.classList.remove('hidden'); }
+    function markActive(){ const hash=location.hash||'#login'; $$('a.nav').forEach(a=>a.classList.toggle('active', a.getAttribute('href')===hash)); }
+    function route(session){
+      const hash = location.hash.replace('#','') || (session ? 'dashboard':'login');
+      const guard=['dashboard','transactions','categories','reports','tax','notifications'];
+      if(!session && guard.includes(hash)){ show('#view-login'); markActive(); return; }
+      const map={login:'#view-login',dashboard:'#view-dashboard',transactions:'#view-transactions',categories:'#view-categories',reports:'#view-reports',tax:'#view-tax',notifications:'#view-notifications'};
+      show(map[hash]||'#view-login'); markActive();
+      if (hash==='dashboard') loadDashboard();
+      if (hash==='transactions') { loadCategoryOptions(); loadTxTable(); }
+      if (hash==='categories') loadCategoriesTable();
+      if (hash==='reports') loadReports();
+      if (hash==='tax') initTax();
+      if (hash==='notifications') loadNotifs();
+    }
+    window.addEventListener('hashchange', async ()=>route((await supabase.auth.getSession()).data.session));
+    supabase.auth.onAuthStateChange((_e,session)=>route(session));
+
+    // Auth
+    $('#signoutBtn').onclick=async()=>{ await supabase.auth.signOut(); toast('ออกจากระบบแล้ว'); location.hash='#login'; route(null); $('#userEmail').textContent=''; };
+    $('#loginBtn').onclick=async()=>{
+      const email=$('#login_email').value.trim(), password=$('#login_password').value;
+      const { error } = await supabase.auth.signInWithPassword({email,password});
+      if (error){ $('#login_msg').textContent='เข้าสู่ระบบไม่สำเร็จ: '+error.message; toast('เข้าสู่ระบบไม่สำเร็จ','err'); }
+      else { $('#login_msg').textContent=''; const u=(await supabase.auth.getUser()).data.user; $('#userEmail').textContent=u?.email||''; toast('ยินดีต้อนรับกลับ!'); location.hash='#dashboard'; }
+    };
+    $('#resetBtn').onclick=async()=>{
+      const email=$('#login_email').value.trim(); if(!email) return toast('กรุณากรอกอีเมลก่อน','err');
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: location.origin+location.pathname+'#login' });
+      if(error) toast('ส่งอีเมลไม่สำเร็จ: '+error.message,'err'); else toast('ส่งลิงก์รีเซ็ตรหัสผ่านแล้ว');
+    };
+    $('#signupBtn').onclick=async()=>{
+      const email=$('#signup_email').value.trim(), password=$('#signup_password').value;
+      const { data, error } = await supabase.auth.signUp({email,password});
+      if(error){ toast('สมัครไม่สำเร็จ: '+error.message,'err'); }
+      else { toast('สมัครสำเร็จ! โปรดยืนยันอีเมล (ถ้ามี)'); if (data?.user) $('#userEmail').textContent=data.user.email; }
+    };
+
+    // Dashboard
+    async function loadDashboard(){
+      const t=new Date(); const ym=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}`;
+      $('#dash_month').value=ym;
+      const m=ym+'-01';
+      const first=(d)=>{const x=new Date(d);x.setDate(1);return x.toISOString().slice(0,10)};
+      const last=(d)=>{const x=new Date(d);x.setMonth(x.getMonth()+1);x.setDate(0);return x.toISOString().slice(0,10)};
+      const from=first(m), to=last(m);
+      const inc=(await supabase.rpc('sum_by_type',{p_from:from,p_to:to,p_type:'income'})).data?.sum||0;
+      const exp=(await supabase.rpc('sum_by_type',{p_from:from,p_to:to,p_type:'expense'})).data?.sum||0;
+      $('#dash_income').textContent=fmt(inc); $('#dash_expense').textContent=fmt(exp);
+      const expPie=(await supabase.rpc('sum_by_category',{p_from:from,p_to:to,p_type:'expense'})).data||[];
+      const incPie=(await supabase.rpc('sum_by_category',{p_from:from,p_to:to,p_type:'income'})).data||[];
+      new Chart($('#pie_expense'),{type:'pie',data:{labels:expPie.map(r=>r.name),datasets:[{data:expPie.map(r=>r.total)}]},options:{responsive:true}});
+      new Chart($('#pie_income'),{type:'pie',data:{labels:incPie.map(r=>r.name),datasets:[{data:incPie.map(r=>r.total)}]},options:{responsive:true}});
+      $('#dash_refresh').onclick=loadDashboard;
+    }
+
+    // Transactions helpers
+    async function loadCategoryOptions(){
+      const type=$('#t_type').value||'expense';
+      const { data } = await supabase.from('categories').select('id,name').eq('type',type).order('name');
+      const sel=$('#category_id'); sel.innerHTML=''; (data||[]).forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.name;sel.appendChild(o)});
+      if(!data||data.length===0) sel.innerHTML='<option value="">(ยังไม่มีหมวดหมู่)</option>';
+      $('#t_type').onchange=loadCategoryOptions;
+    }
+    async function loadTxTable(){
+      const ym=$('#filter_month').value||new Date().toISOString().slice(0,7); const m=ym+'-01';
+      const first=(d)=>{const x=new Date(d);x.setDate(1);return x.toISOString().slice(0,10)};
+      const last=(d)=>{const x=new Date(d);x.setMonth(x.getMonth()+1);x.setDate(0);return x.toISOString().slice(0,10)};
+      const from=first(m), to=last(m); const q=($('#filter_q').value||'').toLowerCase();
+      const { data, error } = await supabase.from('transactions').select('id,t_date,type,amount,memo,categories(name),category_id').gte('t_date',from).lte('t_date',to).order('t_date',{ascending:false});
+      const tbody=$('#tx_table tbody'); tbody.innerHTML='';
+      if(error){ tbody.innerHTML=`<tr><td colspan="6">${error.message}</td></tr>`; return; }
+      const rows=(data||[]).filter(r=>!q || (r.memo||'').toLowerCase().includes(q) || (r.categories?.name||'').toLowerCase().includes(q));
+      $('#tx_empty').classList.toggle('hidden', rows.length>0);
+      rows.forEach(r=>{
+        const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.t_date}</td><td>${r.type}</td><td>${r.categories?.name||''}</td><td class="right">${fmt(r.amount)}</td><td>${r.memo||''}</td>
+        <td class="right"><button class="btn ghost" data-edit="${r.id}">แก้ไข</button> <button class="btn danger" data-del="${r.id}">ลบ</button></td>`; tbody.appendChild(tr);
+      });
+      tbody.querySelectorAll('[data-edit]').forEach(b=>b.onclick=async(e)=>{
+        const id=e.currentTarget.getAttribute('data-edit'); const row=(await supabase.from('transactions').select('*').eq('id',id)).data?.[0];
+        if(row){ $('#t_date').value=row.t_date; $('#t_type').value=row.type; await loadCategoryOptions(); $('#category_id').value=row.category_id; $('#amount').value=row.amount; $('#memo').value=row.memo||''; location.hash='#transactions'; window.scrollTo({top:0,behavior:'smooth'}); }
+      });
+      tbody.querySelectorAll('[data-del]').forEach(b=>b.onclick=async(e)=>{
+        const id=e.currentTarget.getAttribute('data-del'); if(!confirm('ลบรายการนี้?')) return; await supabase.from('transactions').delete().eq('id',id); loadTxTable();
+      });
+    }
+    $('#tx_save').onclick=async()=>{
+      const t_date=$('#t_date').value, type=$('#t_type').value, category_id=$('#category_id').value, amount=parseFloat($('#amount').value||'0'), memo=$('#memo').value.trim();
+      if(!t_date||!category_id||!amount){ $('#tx_msg').textContent='กรุณากรอกข้อมูลให้ครบ'; return; }
+      const { error } = await supabase.from('transactions').insert({ t_date,type,category_id,amount,memo });
+      $('#tx_msg').textContent = error?('บันทึกไม่สำเร็จ: '+error.message):'บันทึกสำเร็จ'; if(!error){ loadTxTable(); $('#amount').value=''; $('#memo').value=''; }
+    };
+    $('#tx_load').onclick=loadTxTable; $('#tx_export').onclick=()=>{ const rows=[...$('#tx_table tbody').querySelectorAll('tr')].map(tr=>[...tr.children].slice(0,5).map(td=>(td.innerText||'').replaceAll(',', ' '))); let csv='วันที่,ประเภท,หมวด,จำนวน,บันทึก\n'; rows.forEach(r=>csv+=r.join(',')+'\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='transactions.csv'; a.click(); URL.revokeObjectURL(url); };
+
+    // Categories
+    async function loadCategoriesTable(){
+      const { data } = await supabase.from('categories').select('*').order('type',{ascending:false}).order('name');
+      const tbody=$('#cat_table tbody'); tbody.innerHTML=''; (data||[]).forEach(r=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${r.type}</td><td>${r.name}</td><td class="right"><button class="btn danger" data-del="${r.id}">ลบ</button></td>`; tbody.appendChild(tr); });
+      tbody.querySelectorAll('[data-del]').forEach(btn=>btn.onclick=async(e)=>{ const id=e.currentTarget.getAttribute('data-del'); if(!confirm('ลบหมวดหมู่นี้?')) return; await supabase.from('categories').delete().eq('id',id); loadCategoriesTable(); });
+    }
+    $('#cat_add').onclick=async()=>{ const type=$('#cat_type').value, name=$('#cat_name').value.trim(); if(!name) return; await supabase.from('categories').insert({type,name}); $('#cat_name').value=''; loadCategoriesTable(); };
+    $('#cat_seed').onclick=async()=>{ const defaults=[{type:'income',name:'เงินเดือน'},{type:'income',name:'ขายของ'},{type:'income',name:'ดอกเบี้ย'},{type:'expense',name:'อาหาร'},{type:'expense',name:'เดินทาง'},{type:'expense',name:'ที่อยู่อาศัย'},{type:'expense',name:'สาธารณูปโภค'},{type:'expense',name:'สุขภาพ'},{type:'expense',name:'บันเทิง'}]; for(const r of defaults) await supabase.from('categories').insert(r); loadCategoriesTable(); };
+
+    // Reports
+    async function loadReports(){
+      const y=parseInt($('#rep_year').value||new Date().getFullYear()); const data=(await supabase.rpc('monthly_income_expense',{p_year:y})).data||[];
+      const months=Array.from({length:12},(_,i)=>i+1); const income=months.map(m=>data.find(r=>r.m===m&&r.type==='income')?.total||0); const expense=months.map(m=>data.find(r=>r.m===m&&r.type==='expense')?.total||0);
+      new Chart($('#rep_bar'),{type:'bar',data:{labels:months.map(m=>'เดือน '+String(m).padStart(2,'0')),datasets:[{label:'รายรับ',data:income},{label:'รายจ่าย',data:expense}]},options:{responsive:true}});
+    }
+    $('#rep_load').onclick=loadReports;
+
+    // Notifications
+    $('#nt_save').onclick=async()=>{ const payload={kind:$('#nt_kind').value,email:$('#nt_email').value.trim(),frequency:$('#nt_frequency').value,threshold:$('#nt_threshold').value?parseFloat($('#nt_threshold').value):null}; const { error }=await supabase.from('notifications').insert(payload); if(error) toast('บันทึกไม่สำเร็จ: '+error.message,'err'); else toast('บันทึกแล้ว'); };
+    async function loadNotifs(){ const { data } = await supabase.from('notifications').select('*').order('created_at',{ascending:false}); const tbody=$('#nt_table tbody'); tbody.innerHTML=''; (data||[]).forEach(n=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${n.kind}</td><td>${n.email}</td><td>${n.frequency}</td><td>${n.threshold??'-'}</td><td>${n.enabled?'ON':'OFF'}</td><td class="right"><button class="btn ghost" data-toggle="${n.id}">${n.enabled?'ปิด':'เปิด'}</button> <button class="btn danger" data-del="${n.id}">ลบ</button></td>`; tbody.appendChild(tr); }); }
+
+    // ===== TAX: Deduction-first =====
+    const TH_BRACKETS=[
+      {min:0, max:150000, rate:0},
+      {min:150000, max:300000, rate:0.05},
+      {min:300000, max:500000, rate:0.10},
+      {min:500000, max:750000, rate:0.15},
+      {min:750000, max:1000000, rate:0.20},
+      {min:1000000, max:2000000, rate:0.25},
+      {min:2000000, max:5000000, rate:0.30},
+      {min:5000000, max:999999999, rate:0.35},
+    ];
+
+    async function initTax(){
+      const y=new Date().getFullYear(); $('#tax_year').value=y;
+      const annual = (await supabase.rpc('annual_income_expense',{p_year:y})).data||[];
+      const totalIncome=annual.find(r=>r.type==='income')?.total||0; const totalExpense=annual.find(r=>r.type==='expense')?.total||0;
+      const net=Math.max(0,totalIncome-totalExpense);
+      $('#tax_netinfo').value = `${fmt(totalIncome)} - ${fmt(totalExpense)} = ${fmt(net)} บาท`;
+      $('#tax_calc').onclick=()=>calcTax(y, totalIncome, totalExpense);
+      $('#tax_clear').onclick=()=>{ ['ded_funds_amt','ded_funds_pct','ded_funds_cap','ded_ssf_amt','ded_ssf_cap','ded_home_amt','ded_home_cap','ded_spouse_amt','ded_child_count','ded_child_per','ded_parent_amt','ded_life_amt','ded_life_cap','ded_health_amt','ded_health_cap','ded_other_amt','ded_other_cap'].forEach(id=>{ const el=$('#'+id); if(el && el.type==='number') el.value = (id.includes('pct')?30:0); }); $('#ded_funds_cap').value=500000; $('#ded_ssf_cap').value=9000; $('#ded_home_cap').value=100000; $('#ded_life_cap').value=100000; $('#ded_health_cap').value=25000; };
+    }
+
+    function calcTax(year,totalIncome,totalExpense){
+      const net = Math.max(0,totalIncome-totalExpense);
+
+      // Gather deductions
+      const funds_amt = parseFloat($('#ded_funds_amt').value||'0');
+      const funds_pct = parseFloat($('#ded_funds_pct').value||'0')/100;
+      const funds_cap = parseFloat($('#ded_funds_cap').value||'0');
+      const funds_allow = Math.min(funds_amt, Math.min(net*funds_pct, funds_cap||Infinity));
+
+      const ssf_amt = parseFloat($('#ded_ssf_amt').value||'0');
+      const ssf_cap = parseFloat($('#ded_ssf_cap').value||'0');
+      const ssf_allow = Math.min(ssf_amt, ssf_cap||Infinity);
+
+      const home_amt = parseFloat($('#ded_home_amt').value||'0');
+      const home_cap = parseFloat($('#ded_home_cap').value||'0');
+      const home_allow = Math.min(home_amt, home_cap||Infinity);
+
+      const spouse_amt = parseFloat($('#ded_spouse_amt').value||'0');
+      const child_count = parseInt($('#ded_child_count').value||'0',10);
+      const child_per = parseFloat($('#ded_child_per').value||'0');
+      const parent_amt = parseFloat($('#ded_parent_amt').value||'0');
+      const family_allow = Math.max(0, spouse_amt) + Math.max(0, child_count*child_per) + Math.max(0, parent_amt);
+
+      const life_amt = parseFloat($('#ded_life_amt').value||'0');
+      const life_cap = parseFloat($('#ded_life_cap').value||'0');
+      const life_allow = Math.min(life_amt, life_cap||Infinity);
+
+      const health_amt = parseFloat($('#ded_health_amt').value||'0');
+      const health_cap = parseFloat($('#ded_health_cap').value||'0');
+      const health_allow = Math.min(health_amt, health_cap||Infinity);
+
+      const other_amt = parseFloat($('#ded_other_amt').value||'0');
+      const other_cap = parseFloat($('#ded_other_cap').value||'0');
+      const other_allow = Math.min(other_amt, other_cap||Infinity);
+
+      const totalDeduction = funds_allow + ssf_allow + home_allow + family_allow + life_allow + health_allow + other_allow;
+
+      const taxable = Math.max(0, net - totalDeduction);
+
+      // Tax compute by brackets
+      let tax=0;
+      for(const b of TH_BRACKETS){
+        if(taxable>b.min){
+          const upper = Math.min(taxable, b.max), part = Math.max(0, upper - b.min);
+          tax += part * b.rate;
+          if(taxable<=b.max) break;
+        } else break;
+      }
+
+      $('#tax_result').innerHTML = `
+        <p>รายรับรวมทั้งปี: <strong>${fmt(totalIncome)}</strong> บาท</p>
+        <p>รายจ่ายรวมทั้งปี: <strong>${fmt(totalExpense)}</strong> บาท</p>
+        <p>กำไรสุทธิ (ก่อนลดหย่อน): <strong>${fmt(net)}</strong> บาท</p>
+        <hr style="border:0;border-top:1px solid var(--border);margin:10px 0;">
+        <p>รวมรายการลดหย่อนทั้งหมด: <strong>${fmt(totalDeduction)}</strong> บาท</p>
+        <p>เงินได้พึงประเมินหลังหักลดหย่อน: <strong>${fmt(taxable)}</strong> บาท</p>
+        <p>ภาษีประมาณการตามอัตราก้าวหน้า: <strong>${fmt(tax)}</strong> บาท</p>
+      `;
+
+      $('#tax_debug').innerHTML = `
+        <details><summary>ดูรายละเอียดรายการลดหย่อน</summary>
+          <ul>
+            <li>กองทุนที่นับ: ${fmt(funds_allow)} (จากกรอก ${fmt(funds_amt)}, เพดานรายได้ ${Math.round(funds_pct*100)}%, เพดานบาท ${fmt(funds_cap)})</li>
+            <li>ประกันสังคมที่นับ: ${fmt(ssf_allow)}</li>
+            <li>ดอกเบี้ยบ้านที่นับ: ${fmt(home_allow)}</li>
+            <li>ครอบครัวที่นับ: ${fmt(family_allow)} (คู่สมรส + บุตร + ดูแลบุพการี/ผู้พิการ)</li>
+            <li>ประกันชีวิตที่นับ: ${fmt(life_allow)}</li>
+            <li>ประกันสุขภาพที่นับ: ${fmt(health_allow)}</li>
+            <li>กองทุนอื่นๆที่นับ: ${fmt(other_allow)}</li>
+          </ul>
+        </details>
+      `;
+    }
+
+    // Init
+    (async function init(){
+      const t=new Date(); const ym=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}`;
+      $('#rep_year').value=t.getFullYear(); $('#filter_month').value=ym; $('#t_date').value=ymd(new Date()); $('#tax_year').value=t.getFullYear();
+      const session=(await supabase.auth.getSession()).data.session; route(session); markActive();
+      const u=(await supabase.auth.getUser()).data.user; $('#userEmail').textContent=u?.email||'';
+    })();
+  </script>
+</body>
+</html>
+
